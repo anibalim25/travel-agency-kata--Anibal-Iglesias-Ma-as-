@@ -2,12 +2,9 @@ name: Java CI/CD Pipeline
 
 on:
   push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+    branches: [ "feature/add-jpa-persistence" ]
 
 jobs:
-  # --- CI: Formateo, build y tests ---
   verify:
     runs-on: ubuntu-latest
     steps:
@@ -23,7 +20,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ~/.m2/repository
-          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          key: ${{ runner.os }}-m2-${{ hashFiles('pom.xml') }}
           restore-keys: |
             ${{ runner.os }}-m2-
 
@@ -33,29 +30,22 @@ jobs:
       - name: Build and test
         run: mvn clean verify
 
-  # --- CD: Docker y despliegue (solo en push a main) ---
   deploy:
       needs: verify
       runs-on: ubuntu-latest
       steps:
-        - name: 🔽 Checkout del código
+        - name: Checkout del código
           uses: actions/checkout@v4
   
-        - name: 🔐 Iniciar sesión en Docker Hub
+        - name: Iniciar sesión en Docker Hub
           uses: docker/login-action@v3
           with:
             username: ${{ secrets.DOCKERHUB_USERNAME }}
             password: ${{ secrets.DOCKERHUB_TOKEN }}
   
-        - name: 🐳 Construir y subir imagen Docker
+        - name: Construir y subir imagen Docker
           uses: docker/build-push-action@v5
           with:
             context: .
             push: true
-            tags: ${{ secrets.DOCKERHUB_USERNAME }}/travel-agency-kata:latest
-  
-        - name: 🚀 Desplegar en Render
-          run: |
-            set -e  # Detiene el script si falla un comando
-            curl -X POST \
-              "${{ secrets.RENDER_DEPLOY_WEBHOOK }}?imgURL=docker.io%2F${{ secrets.DOCKERHUB_USERNAME }}%2Ftravel-agency-kata%3Alatest"
+            tags: ${{ secrets.DOCKERHUB_USERNAME }}/travel-agency-kata-anibal-iglesias-manas:latest
