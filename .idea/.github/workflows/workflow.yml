@@ -1,0 +1,61 @@
+name: Java CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  # --- CI: Formateo, build y tests ---
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v3
+        with:
+          java-version: '21'
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-
+
+      - name: Run Spotless check
+        run: mvn spotless:check
+
+      - name: Build and test
+        run: mvn clean verify
+
+  # --- CD: Docker y despliegue (solo en push a main) ---
+  deploy:
+      needs: verify
+      runs-on: ubuntu-latest
+      steps:
+        - name: 🔽 Checkout del código
+          uses: actions/checkout@v4
+  
+        - name: 🔐 Iniciar sesión en Docker Hub
+          uses: docker/login-action@v3
+          with:
+            username: ${{ secrets.DOCKERHUB_USERNAME }}
+            password: ${{ secrets.DOCKERHUB_TOKEN }}
+  
+        - name: 🐳 Construir y subir imagen Docker
+          uses: docker/build-push-action@v5
+          with:
+            context: .
+            push: true
+            tags: ${{ secrets.DOCKERHUB_USERNAME }}/travel-agency-kata:latest
+  
+        - name: 🚀 Desplegar en Render
+          run: |
+            set -e  # Detiene el script si falla un comando
+            curl -X POST \
+              "${{ secrets.RENDER_DEPLOY_WEBHOOK }}?imgURL=docker.io%2F${{ secrets.DOCKERHUB_USERNAME }}%2Ftravel-agency-kata%3Alatest"
